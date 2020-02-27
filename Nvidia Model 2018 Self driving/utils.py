@@ -2,6 +2,8 @@ import cv2, os
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+from keras.utils import to_categorical
+
 
 IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS =227,227,3
 INPUT_SHAPE = (IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS)
@@ -61,19 +63,23 @@ def preprocess(image):
 
 
 def choose_image(data_dir, center, steering_angle):
-    """
+    '''
     Randomly choose an image from the center, left or right, and adjust
     the steering angle.
-    """
-    """
+    
+    
     choice = np.random.choice(3)
     if choice == 0:
         return load_image(data_dir, left), steering_angle + 0.2
     elif choice == 1:
         return load_image(data_dir, right), steering_angle - 0.2
-    """
+    '''
     return load_image(data_dir, center), steering_angle
-
+    
+def str_to_float(inp):
+    inp = inp[1:-1]
+    res = [float(idx) for idx in inp.split(',')]
+    return res
 
 def random_flip(image, steering_angle):
     """
@@ -135,7 +141,7 @@ def random_brightness(image):
     ratio = 1.0 + 0.4 * (np.random.rand() - 0.5)
     hsv[:,:,2] =  hsv[:,:,2] * ratio
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-
+## here we stopped yesterday at the place ###
 
 def augument(data_dir, center, steering_angle, range_x=100, range_y=10):#**
     """
@@ -150,30 +156,45 @@ def augument(data_dir, center, steering_angle, range_x=100, range_y=10):#**
     return image, steering_angle
 
 
-def batch_generator(data_dir, image_paths, steering_angles, batch_size, is_training):
+def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,speeds ,batch_size, is_training):
     """
     Generate training image give image paths and associated steering angles
     """
     images = np.empty([batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS])
     steers = np.empty(batch_size)
+    #speed_sequences = np.empty(batch_size*10).reshape(batch_size,10)
+    speed_seq = np.empty((1,10,batch_size))
+    #speed_seq = np.zeros((1,10,))
+    speed = np.empty(batch_size)
     while True:
         i = 0
         for index in np.random.permutation(image_paths.shape[0]):
             center= image_paths[index] #**
             print(center)
-            steering_angle = steering_angles[index]
+            steering_angle  = steering_angles[index]
+            #speed_Sequences = speed_sequences[index]
+            #speed  = speeds[index]
             # argumentation
             if is_training and np.random.rand() < 0.6:
                 image, steering_angle = augument(data_dir, center,steering_angle)#**
             else:
                 image = load_image(data_dir, center) 
             # add the image and steering angle to the batch
-            images[i] = preprocess(image)
-            steers[i] = steering_angle
+            images[i]    = preprocess(image)
+            steers[i]    = steering_angle
+            speed_seq[:,:,i] = str_to_float(speed_sequences[i])
+            speed[i]     = speeds[i]
             i += 1
             if i == batch_size:
                 break
-        yield images, steers
+        #speed_labels = to_categorical(speed)
+        #steers_labels = to_categorical(steers)
+        inputs = [ images , speed_seq ] 
+        outputs = [speed , steers]
+        yield inputs , outputs
+
+
+
 def Append_Sequence(listt , value):
     for i in range(0,9):
         listt[i] = listt[i+1]

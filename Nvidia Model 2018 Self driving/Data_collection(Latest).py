@@ -125,10 +125,10 @@ except ImportError:
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
-def Append_Sequence(listt , value):
-    for i in range(0,9):
-        listt[i] = listt[i+1]
-    listt[9] = value
+def Append_Sequence(listt , value , length):
+    for i in range(0,length):
+        listt[length-1-i] = listt[length-1-i-1]
+    listt[0] = value
     return listt
 
 def find_weather_presets():
@@ -798,7 +798,7 @@ class CameraManager(object):
             global TThrottle
             global BBrake
             global Speed_Sequence
-            Speed_Sequence = Append_Sequence(Speed_Sequence , SSpeed)
+            Speed_Sequence = Append_Sequence(Speed_Sequence , SSpeed, 10)
             data.append([float(SSpeed),float(SSteer),float(TThrottle),float(BBrake),str(Speed_Sequence)])
             image.save_to_disk('_out/%08d' % image.frame_number)
             
