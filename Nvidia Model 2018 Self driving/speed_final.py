@@ -197,32 +197,6 @@ def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer,
                         validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False),
                         nb_val_samples=len(X_valid_image),
                         callbacks=[checkpoint])
-    '''
-    inputs_training  = batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True)
-    inputs_Validation  = batch_generator(args.data_dir,X_valid_image ,X_valid_Sequence,Y_valid_steer,Y_valid_speed, args.batch_size, False)
-
-    
-    concate_model.fit_generator([inputs_training[0] , inputs_training[1]], [inputs_training[3] , inputs_training[4]],
-                    args.samples_per_epoch,
-                        args.nb_epoch,
-                        max_q_size=1,
-                        validation_data=([inputs_Validation[0] , inputs_Validation[1]], [inputs_Validation[0] , inputs_Validation[1]]),
-    callbacks=[checkpoint])
-    
-    
-    model.fit(a_train, [x_train, y_train],
-              batch_size=batch_size,
-              epochs=epochs,
-              verbose=1,
-              validation_data=(a_test, [x_test, y_test]),
-              callbacks=[checkpoint])
-    score = model.evaluate(a_test, [x_test, y_test], verbose=0) 
-    
-    concate_model.fit([X_train_image, X_train_Sequence], [Y_train_steer, Y_train_speed],
-                    validation_data=([X_valid_image, X_valid_Sequence], [Y_train_steer, Y_train_speed])
-          epochs=1, batch_size=10)
-    
-    '''
 #for command line args
 def s2b(s):
     """
@@ -240,9 +214,9 @@ def main():
     parser.add_argument('-d', help='data directory',        dest='data_dir',          type=str,   default='D:/Graduation project/CARLA/PythonAPI/examples/_out')
     parser.add_argument('-t', help='test size fraction',    dest='test_size',         type=float, default=0.2)
     parser.add_argument('-k', help='drop out probability',  dest='keep_prob',         type=float, default=0.5)
-    parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=10)
-    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=50)
-    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=1)
+    parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=100)
+    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=1000)
+    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=16)
     parser.add_argument('-o', help='save best models only', dest='save_best_only',    type=s2b,   default='true')
     parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1.0e-4)
     args = parser.parse_args()
@@ -263,7 +237,7 @@ def main():
     #train model on data, it saves as model.h5 
 
     train_model(Total_Model, args, *data)
-    #Speed_Model.save("model.h5")
+    Total_Model.save("model.h5")
 
 
 if __name__ == '__main__':

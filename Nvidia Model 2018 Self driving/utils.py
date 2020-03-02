@@ -162,9 +162,8 @@ def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,spe
     """
     images = np.empty([batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS])
     steers = np.empty(batch_size)
-    #speed_sequences = np.empty(batch_size*10).reshape(batch_size,10)
-    speed_seq = np.empty((1,10,batch_size))
-    #speed_seq = np.zeros((1,10,))
+    speed_seq = np.empty((batch_size,10,1))
+    temp = np.zeros((1,10))
     speed = np.empty(batch_size)
     while True:
         i = 0
@@ -182,13 +181,16 @@ def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,spe
             # add the image and steering angle to the batch
             images[i]    = preprocess(image)
             steers[i]    = steering_angle
-            speed_seq[:,:,i] = str_to_float(speed_sequences[i])
+            temp = np.array(str_to_float(speed_sequences[i]))
+            temp = temp.reshape((10,1))
+            speed_seq[i,:,:] = temp
             speed[i]     = speeds[i]
             i += 1
             if i == batch_size:
                 break
         #speed_labels = to_categorical(speed)
         #steers_labels = to_categorical(steers)
+        speed_seq = speed_seq.reshape((batch_size,10,1))
         inputs = [ images , speed_seq ] 
         outputs = [speed , steers]
         yield inputs , outputs
