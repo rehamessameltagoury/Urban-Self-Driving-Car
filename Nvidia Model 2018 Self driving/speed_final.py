@@ -5,6 +5,7 @@ from keras.models import Model
 from keras.layers import Input 
 from keras.layers import concatenate
 from keras.utils import plot_model
+import matplotlib.pyplot as plt
 
 from keras.preprocessing.image import ImageDataGenerator
 from keras.preprocessing.image import img_to_array
@@ -38,7 +39,7 @@ S=[]
 #config.gpu_options.allow_growth = True
 import tensorflow as tf
  
-
+from tensorflow.keras.models import load_model
 from keras.backend.tensorflow_backend import set_session
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
@@ -100,33 +101,35 @@ def build_model_speed(args):
     #steer model 
     Steer_In =Input(shape=(227,227,3),name='model1_in')
     #conv1
-    Steer = Conv2D(96, 11, 11, activation='relu', subsample=(4,4))(Steer_In)
+    Steer = Conv2D(filters = 96, activation='relu',kernel_size = (11, 11), strides=(4,4))(Steer_In) #assumed that stride step is 1x1
     Steer = BatchNormalization()(Steer)
-    Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)
+    Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
+
     #conv2
-    Steer = Conv2D(256, 5, 5, activation='relu', subsample=(1,1))(Steer)
+    Steer = Conv2D(filters = 256, kernel_size = (5,5), activation='relu', strides=(1,1))(Steer)
     Steer = BatchNormalization()(Steer)
-    Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)
+    Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
+
     #conv3
-    Steer = Conv2D(384, 3, 3, activation='relu', subsample=(1,1))(Steer)
+    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
     #conv4
-    Steer = Conv2D(384,3,3, activation='relu', subsample=(1,1))(Steer)
+    Steer = Conv2D(filters =384,kernel_size =(3,3), activation='relu', strides=(1,1))(Steer)
     #conv5
-    Steer = Conv2D(256, 3, 3, activation='relu',subsample=(1,1))(Steer)
+    Steer = Conv2D(filters = 256,kernel_size =(3, 3), activation='relu',strides=(1,1))(Steer)
     Steer = Flatten()(Steer)
     #FC1
-    Steer = Dense(1024, activation='elu')(Steer)
+    Steer = Dense(1024, activation='relu')(Steer)
     Steer = Dropout(args.keep_prob , name='Dropout1')(Steer)
     #FC2
-    Steer = Dense(50, activation='elu')(Steer)
+    Steer = Dense(50, activation='relu')(Steer)
     Steer_out = Dropout(args.keep_prob, name='Dropout2')(Steer)
+
     Steer_Model1 = Model(inputs=Steer_In, outputs=Steer_out)
     ################################################################################
     ##############################speed model2 before concate_model#################
     Speed_In = Input(shape=(10,1),name='Speed_In')
     Speed =LSTM(128,return_sequences=True)(Speed_In)
     Speed = Flatten()(Speed)
-    #model2_in = Embedding(len(word_index) + 1, 300, input_length = 40, dropout = 0.2)
     #L2_out = (LSTM(300, dropout_W = 0.2, dropout_U = 0.2)(L2_out)
     #L2_out = Flatten()(L2_out)
     #FC1
@@ -143,17 +146,17 @@ def build_model_speed(args):
     #out = BatchNormalization()(merged_layers)
     Speed_Continue = Dense(50, activation='elu')(First_Merge)
     Speed_Continue = Dropout(args.keep_prob, name='Dropout5')(Speed_Continue)
-    Speed_Out = Dense(1, name='Dense_last_speed')(Speed_Continue)
+    Speed_Out = Dense(1, name='Speed')(Speed_Continue)
     Speed_Model = Model(inputs = [Steer_In,Speed_In],outputs = [Speed_Out])
     #continue Steering model
-    Steer_Continue = Dense(50, activation='elu')(Steer_out) #node 1 output to FC3
+    Steer_Continue = Dense(50, activation='relu')(Steer_out) #node 1 output to FC3
     Steer_Continue = Dropout(args.keep_prob, name='Dropout6')(Steer_Continue) #steer output
-    Steer_Continue = Dense(1 , name = 'Dense_last_steer')(Steer_Continue)
+    Steer_Continue = Dense(1 , name = 'Steering_Angle')(Steer_Continue)
     Steer_Model   = Model(inputs = [Steer_In],outputs = [Steer_Continue])
 
     Final_Model = Model(inputs=[Steer_In , Speed_In], outputs=[Speed_Model.output , Steer_Model.output])
     ########################################################################
-    Final_Model.compile(loss='mean_squared_error', optimizer=Adam(lr=args.learning_rate))
+    
     #Steer_Model.compile(loss='mean_squared_error', optimizer=Adam(lr=args.learning_rate))
 
     Final_Model.summary()
@@ -182,7 +185,7 @@ def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer,
     #that value is our mean squared error! this is what we want to minimize via
     #gradient descent
     #concate_model.compile(loss='mean_squared_error', optimizer=Adam(lr=args.learning_rate))
-
+    concate_model.compile(loss='mean_squared_error' ,metrics={'Steering_Angle': 'accuracy', 'Speed':'accuracy'}, optimizer=Adam(lr=args.learning_rate))
     #Fits the model on data generated batch-by-batch by a Python generator.
 
     #The generator is run in parallel to the model, for efficiency. 
@@ -190,13 +193,30 @@ def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer,
     #parallel to training your model on GPU.
     #so we reshape our data into their appropriate batches and train our model simulatenously
     
-    concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True),
+    history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True),
                         args.samples_per_epoch,
                         args.nb_epoch,
                         max_q_size=1,
                         validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False),
                         nb_val_samples=len(X_valid_image),
-                        callbacks=[checkpoint])
+                        callbacks=[checkpoint],
+                        verbose = 1)
+    
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    # summarize history for loss
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
 #for command line args
 def s2b(s):
     """
@@ -214,9 +234,9 @@ def main():
     parser.add_argument('-d', help='data directory',        dest='data_dir',          type=str,   default='D:/Graduation project/CARLA/PythonAPI/examples/_out')
     parser.add_argument('-t', help='test size fraction',    dest='test_size',         type=float, default=0.2)
     parser.add_argument('-k', help='drop out probability',  dest='keep_prob',         type=float, default=0.5)
-    parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=100)
-    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=1000)
-    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=16)
+    parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=10)
+    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=100000)
+    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=20)
     parser.add_argument('-o', help='save best models only', dest='save_best_only',    type=s2b,   default='true')
     parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1.0e-4)
     args = parser.parse_args()
@@ -233,13 +253,17 @@ def main():
     data = load_data(args)
     #build model
     Total_Model  = build_model_speed(args)        #Steer_Model
+    #Total_Model = load_model('model-002(new).h5')
     print("Done")
     #train model on data, it saves as model.h5 
 
     train_model(Total_Model, args, *data)
     Total_Model.save("model.h5")
+    
 
-
+    #Total_Model.evaluate(batch_generator(args.data_dir,data[1] ,data[5],data[3],data[7], args.batch_size, False))
+    #Total_Model.evaluate(batch_generator(args.data_dir,data[1] ,data[5],data[3],data[7], args.batch_size , False), 
+    #    verbose=1)
 if __name__ == '__main__':
     main()
 
