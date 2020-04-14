@@ -254,6 +254,8 @@ def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,spe
         #print("Current_Batch = " + str(current_batch))
         if(current_batch >= sample_per_epoch*0.7):
             current_batch = 0
+        elif(current_batch >= sample_per_epoch*0.3 and !is_training):
+            current_batch = 0
         speed_seq = speed_seq.reshape((batch_size,10,1))
         inputs = [ images , speed_seq ] 
         outputs = [speed , steers]
