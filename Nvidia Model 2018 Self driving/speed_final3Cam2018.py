@@ -215,7 +215,7 @@ def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer,
         history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True,args.samples_per_epoch),
                             args.samples_per_epoch,
                             args.nb_epoch,
-                            validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False),
+                            validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False,args.sample_per_epoch),
                             callbacks=[checkpoint],
                             verbose = 1)
     '''   
