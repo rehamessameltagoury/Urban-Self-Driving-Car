@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS =227,227,3
 INPUT_SHAPE = (IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS)
-
+current_batch = 0
 ##Not sure
 """
 def remove(string): 
@@ -74,10 +74,13 @@ def choose_image(data_dir, center, left, right, steering_angle):
     """
     choice = np.random.choice(3)
     if choice == 0:
+        #print(left)    
         return load_image(data_dir, left), steering_angle + 0.2
+
     elif choice == 1:
+        #print(right)
         return load_image(data_dir, right), steering_angle - 0.2
-    
+    #print(center)
     return load_image(data_dir, center), steering_angle
 
 
@@ -200,28 +203,43 @@ def str_to_float(inp):
     inp = inp[1:-1]
     res = [float(idx) for idx in inp.split(',')]
     return res
-def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,speeds ,batch_size, is_training):
+def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,speeds ,batch_size, is_training,sample_per_epoch):
     """
     Generate training image give image paths and associated steering angles
     """
+    global current_batch
     images = np.empty([batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS])
     steers = np.empty(batch_size)
     speed_seq = np.empty((batch_size,10,1))
     temp = np.zeros((1,10))
     speed = np.empty(batch_size)
+    #print((len(image_paths[0])))
+    #print((len(image_paths[2])))
+    #print((len(image_paths[3])))
+
     while True:
         i = 0
-        for index in np.random.permutation(image_paths.shape[0]):
+        #print(((image_paths[0])))
+        #print(((image_paths[1])))
+        #print(((image_paths[2])))
+        #for index in np.random.permutation(image_paths.shape[0]):
+        for index in range(batch_size*current_batch , batch_size*current_batch + batch_size):
+
             center, left, right = image_paths[index]
-            print(center)
+            #print(index)
             steering_angle = steering_angles[index]
             speed_index        = speeds[index]
-            speed_seqq       = str_to_float(speed_sequences[i])
+            speed_seqq       = str_to_float(speed_sequences[index])
             # argumentation
             if is_training and np.random.rand() < 0.6:
                 image, steering_angle = augument(data_dir, center, left, right, steering_angle)
+                #print("augmentation")
+            #elif is_training:
+            #    image, steering_angle =choose_image(data_dir, center, left, right, steering_angle)
             else:
-                image = load_image(data_dir, center) 
+                image = load_image(data_dir, center)
+                #print("No augmentation")
+                #image, steering_angle =choose_image(data_dir, center, left, right, steering_angle)
             # add the image and steering angle to the batch
             images[i] = preprocess(image)
             steers[i] = steering_angle
@@ -232,6 +250,10 @@ def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,spe
             i += 1
             if i == batch_size:
                 break
+        current_batch +=1
+        #print("Current_Batch = " + str(current_batch))
+        if(current_batch >= sample_per_epoch*0.7):
+            current_batch = 0
         speed_seq = speed_seq.reshape((batch_size,10,1))
         inputs = [ images , speed_seq ] 
         outputs = [speed , steers]

@@ -17,12 +17,13 @@ from sklearn.model_selection import train_test_split #to split out training and 
 from keras.models import Sequential
 #popular optimization strategy that uses gradient descent 
 from keras.optimizers import Adam
+from keras.regularizers import l2
 #to save our model periodically as checkpoints for loading later
 from keras.callbacks import ModelCheckpoint
 #what types of layers do we want our model to have?
 from keras.layers import Lambda, Conv2D, MaxPooling2D, Dropout, Dense, Flatten , BatchNormalization,LSTM
 #helper class to define input shape and generate training images given image paths & steering angles
-from utils3Cam2018.py import INPUT_SHAPE, batch_generator
+from utils3Cam2018 import INPUT_SHAPE, batch_generator
 #for command line arguments
 import argparse
 #for reading files
@@ -39,7 +40,7 @@ S=[]
 #config = tf.ConfigProto()
 #config.gpu_options.allow_growth = True
 import tensorflow as tf
- 
+from keras import initializers
 from tensorflow.keras.models import load_model
 from keras.backend.tensorflow_backend import set_session
 config = tf.compat.v1.ConfigProto()
@@ -48,6 +49,12 @@ config.log_device_placement = True  # to log device placement (on which device t
                                     # (nothing gets printed in Jupyter, only if you run it standalone)
 sess = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(sess)
+
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CODA_VISIBLE_DEVICES"] = "0"
+
+#sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+
 '''                                         ### THE OLD LOAD DATA ONE ###
 def load_data(args):
     """
@@ -81,6 +88,7 @@ def load_data(args):
     #yay dataframes, we can select rows and columns by their names
     #we'll store the camera images as our input data
     #x_Images = data_df['center'].values
+    index  = data_df['index'].values
     x_Images = data_df[['center', 'left', 'right']].values
     x_Speed_Sequence  = data_df['Speed_Sequence'].values
     #and our speed commands as our output data
@@ -89,8 +97,8 @@ def load_data(args):
     #S = data_df['speed'].values
     #now we can split the data into a training (80), testing(20), and validation set
     #thanks scikit learn
-    X_train_image, X_valid_image, Y_train_steer, Y_valid_steer = train_test_split(x_Images, y_steer, test_size=args.test_size, random_state=0)
-    X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed = train_test_split(x_Speed_Sequence, y_speed, test_size=args.test_size, random_state=0)
+    X_train_image, X_valid_image, Y_train_steer, Y_valid_steer = train_test_split(x_Images, y_steer, test_size=args.test_size, random_state=0,shuffle= False)
+    X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed = train_test_split(x_Speed_Sequence, y_speed, test_size=args.test_size, random_state=0,shuffle= False)
     '''X_valid = X_train[60:]
     X_train = X_train[:60]
     y_valid = y_train[60:]
@@ -105,25 +113,25 @@ def build_model_speed(args , Compute_Time = False):
     #steer model 
     Steer_In =Input(shape=(227,227,3),name='model1_in')
     #conv1
-    Steer = Conv2D(filters = 96, activation='relu',kernel_size = (11, 11), strides=(4,4))(Steer_In) #assumed that stride step is 1x1
+    Steer = Conv2D(filters = 96, activation='relu',kernel_size = (11, 11), strides=(4,4),kernel_initializer='he_uniform', bias_initializer='zeros')(Steer_In) #assumed that stride step is 1x1
     Steer = BatchNormalization()(Steer)
     Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
     #conv2
-    Steer = Conv2D(filters = 256, kernel_size = (5,5), activation='relu', strides=(1,1))(Steer)
+    Steer = Conv2D(filters = 256, kernel_size = (5,5), activation='relu', strides=(1,1),kernel_initializer='he_uniform', bias_initializer='zeros')(Steer)
     Steer = BatchNormalization()(Steer)
     Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
     #conv3
-    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
+    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1),kernel_initializer='he_uniform', bias_initializer='zeros')(Steer)
     #conv4
-    Steer = Conv2D(filters =384,kernel_size =(3,3), activation='relu', strides=(1,1))(Steer)
+    Steer = Conv2D(filters =384,kernel_size =(3,3), activation='relu', strides=(1,1),kernel_initializer='he_uniform', bias_initializer='zeros')(Steer)
     #conv5
-    Steer = Conv2D(filters = 256,kernel_size =(3, 3), activation='relu',strides=(1,1))(Steer)
+    Steer = Conv2D(filters = 256,kernel_size =(3, 3), activation='relu',strides=(1,1),kernel_initializer='he_uniform', bias_initializer='zeros')(Steer)
     Steer = Flatten()(Steer)
     #FC1
-    Steer = Dense(1024, activation='relu')(Steer)
+    Steer = Dense(1024, activation='relu',kernel_initializer='he_uniform', bias_initializer='zeros')(Steer)
     Steer = Dropout(args.keep_prob , name='Dropout1')(Steer)
     #FC2
-    Steer = Dense(50, activation='relu')(Steer)
+    Steer = Dense(50, activation='relu',kernel_initializer='he_uniform', bias_initializer='zeros')(Steer)
     Steer_out = Dropout(args.keep_prob, name='Dropout2')(Steer)
     Steer_Model1 = Model(inputs=Steer_In, outputs=Steer_out)
     ################################################################################
@@ -134,10 +142,10 @@ def build_model_speed(args , Compute_Time = False):
     #L2_out = (LSTM(300, dropout_W = 0.2, dropout_U = 0.2)(L2_out)
     #L2_out = Flatten()(L2_out)
     #FC1
-    Speed = Dense(50,activation='elu')(Speed)
+    Speed = Dense(50,activation='elu',kernel_initializer='he_uniform', bias_initializer='zeros')(Speed)
     Speed = Dropout(args.keep_prob, name='Dropout3')(Speed)
     #FC2
-    Speed = Dense(50, activation='elu')(Speed)
+    Speed = Dense(50, activation='elu',kernel_initializer='he_uniform', bias_initializer='zeros' )(Speed)
     Speed = Dropout(args.keep_prob, name='Dropout4')(Speed)
     Speed_Model1   = Model(inputs=Speed_In, outputs=Speed)
     ################ here is our concate_model#########################
@@ -145,14 +153,14 @@ def build_model_speed(args , Compute_Time = False):
     First_Merge    = concatenate([Speed_Model1.output, Steer_Model1.output], name='Concatenate')
     #print(merged_layers)           
     #out = BatchNormalization()(merged_layers)
-    Speed_Continue = Dense(50, activation='elu')(First_Merge)
+    Speed_Continue = Dense(50, activation='elu',kernel_initializer='he_uniform', bias_initializer='zeros')(First_Merge)
     Speed_Continue = Dropout(args.keep_prob, name='Dropout5')(Speed_Continue)
-    Speed_Out      = Dense(1, name='Speed')(Speed_Continue)
+    Speed_Out      = Dense(1, name='Speed',kernel_initializer='he_uniform', bias_initializer='zeros')(Speed_Continue)
     Speed_Model    = Model(inputs = [Steer_In,Speed_In],outputs = [Speed_Out])
     #continue Steering model
-    Steer_Continue = Dense(50, activation='relu')(Steer_out) #node 1 output to FC3
+    Steer_Continue = Dense(50, activation='relu',kernel_initializer='he_uniform', bias_initializer='zeros')(Steer_out) #node 1 output to FC3
     Steer_Continue = Dropout(args.keep_prob, name='Dropout6')(Steer_Continue) #steer output
-    Steer_Continue = Dense(1 , name = 'Steering_Angle')(Steer_Continue)
+    Steer_Continue = Dense(1 , name = 'Steer',kernel_initializer='he_uniform', bias_initializer='zeros')(Steer_Continue)
     Steer_Model    = Model(inputs = [Steer_In],outputs = [Steer_Continue])
     Final_Model    = Model(inputs=[Steer_In , Speed_In], outputs=[Speed_Model.output , Steer_Model.output])
     ########################################################################
@@ -194,17 +202,17 @@ def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer,
     #parallel to training your model on GPU.
     #so we reshape our data into their appropriate batches and train our model simulatenously
     if Continue == False:
-        concate_model.compile(loss='mean_squared_error' ,metrics={'Steering_Angle': 'accuracy', 'Speed':'accuracy'}, optimizer=Adam(lr=args.learning_rate))
-        history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True),
+        concate_model.compile(loss='mean_squared_error' ,metrics={'Steer': 'mean_absolute_error', 'Speed':'mean_absolute_error'}, optimizer=Adam(learning_rate=args.learning_rate))
+        history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True,args.samples_per_epoch),
                             args.samples_per_epoch,
                             args.nb_epoch,
                             max_q_size=1,
-                            validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False),
+                            validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False,args.samples_per_epoch),
                             nb_val_samples=len(X_valid_image),
                             callbacks=[checkpoint],
                             verbose = 1)
     else:
-        history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True),
+        history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True,args.samples_per_epoch),
                             args.samples_per_epoch,
                             args.nb_epoch,
                             validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False),
@@ -277,11 +285,11 @@ def main():
     parser.add_argument('-d', help='data directory',        dest='data_dir',          type=str,   default='D:/Graduation project/CARLA/PythonAPI/examples')
     parser.add_argument('-t', help='test size fraction',    dest='test_size',         type=float, default=0.2)
     parser.add_argument('-k', help='drop out probability',  dest='keep_prob',         type=float, default=0.5)
-    parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=10)
-    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=5000)
-    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=20)
+    parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=20)
+    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=312)
+    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=64)
     parser.add_argument('-o', help='save best models only', dest='save_best_only',    type=s2b,   default='true')
-    parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1.0e-4)
+    parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=0.001)
     args = parser.parse_args()
 
     #print parameters
