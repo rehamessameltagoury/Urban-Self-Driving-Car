@@ -250,10 +250,12 @@ def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,spe
             i += 1
             if i == batch_size:
                 break
-        current_batch +=1
+        current_batch +=1 #this is to keep data not shuffled 
         #print("Current_Batch = " + str(current_batch))
-        if (batch_size+1)*current_batch >4000:
+        if current_batch >= sample_per_epoch-1 and is_training == True:
             current_batch = 0
+        elif current_batch >= (sample_per_epoch-1)*0.2 and is_training == False: # if now in validation mode , it wouldn't exceed the validation percent of data 
+            current_batch = 0 
         #elif(current_batch >= sample_per_epoch*0.3 and is_training == False):
         #    current_batch = 0
         speed_seq = speed_seq.reshape((batch_size,10,1))

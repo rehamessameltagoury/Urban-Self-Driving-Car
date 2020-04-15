@@ -10,7 +10,6 @@ import time
 from keras.preprocessing.image import ImageDataGenerator
 from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import load_img
-
 from sklearn.model_selection import train_test_split #to split out training and testing data
 #keras is a high level wrapper on top of tensorflow (machine learning library)
 #The Sequential container is a linear stack of layers
@@ -28,6 +27,7 @@ from utils3Cam2018new import INPUT_SHAPE, batch_generator
 import argparse
 #for reading files
 import os
+from keras.utils import plot_model
 
 #import tensorflow as tf
 #from tensorflow import ConfigProto
@@ -109,7 +109,7 @@ def load_data(args):
     return  X_train_image, X_valid_image, Y_train_steer, Y_valid_steer , X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed  #, y_train_steer, y_valid_steer
     #return X_train, X_valid, y_train, y_valid
 
-def build_model_speed(args , Compute_Time = False):
+'''def build_model_speed(args , Compute_Time = False):
     #steer model 
     Steer_In =Input(shape=(227,227,3),name='model1_in')
     #conv1
@@ -170,6 +170,68 @@ def build_model_speed(args , Compute_Time = False):
     else:
         Final_Model.summary()
         return Final_Model
+'''
+def build_model_speed(args , Compute_Time = False):
+    #steer model 
+    Steer_In =Input(shape=(227,227,3),name='model1_in')
+    #conv1
+    Steer = Conv2D(filters = 96, activation='relu',kernel_size = (11, 11), strides=(4,4))(Steer_In) #assumed that stride step is 1x1
+    Steer = BatchNormalization()(Steer)
+    Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
+    #conv2
+    Steer = Conv2D(filters = 256, kernel_size = (5,5), activation='relu', strides=(1,1))(Steer)
+    Steer = BatchNormalization()(Steer)
+    Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
+    #conv3
+    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
+    #conv4
+    Steer = Conv2D(filters =384,kernel_size =(3,3), activation='relu', strides=(1,1))(Steer)
+    #conv5
+    Steer = Conv2D(filters = 256,kernel_size =(3, 3), activation='relu',strides=(1,1))(Steer)
+    Steer = Flatten()(Steer)
+    #FC1
+    Steer = Dense(1024, activation='relu')(Steer)
+    Steer = Dropout(args.keep_prob , name='Dropout1')(Steer)
+    #FC2
+    Steer = Dense(50, activation='relu')(Steer)
+    Steer_out = Dropout(args.keep_prob, name='Dropout2')(Steer)
+    Steer_Model1 = Model(inputs=Steer_In, outputs=Steer_out)
+    ################################################################################
+    ##############################speed model2 before concate_model#################
+    Speed_In = Input(shape=(10,1),name='Speed_In')
+    Speed =LSTM(128,return_sequences=True)(Speed_In)
+    Speed = Flatten()(Speed)
+    #L2_out = (LSTM(300, dropout_W = 0.2, dropout_U = 0.2)(L2_out)
+    #L2_out = Flatten()(L2_out)
+    #FC1
+    Speed = Dense(50,activation='elu')(Speed)
+    Speed = Dropout(args.keep_prob, name='Dropout3')(Speed)
+    #FC2
+    Speed = Dense(50, activation='elu' )(Speed)
+    Speed = Dropout(args.keep_prob, name='Dropout4')(Speed)
+    Speed_Model1   = Model(inputs=Speed_In, outputs=Speed)
+    ################ here is our concate_model#########################
+    #concatenate(inputs, axis=-1, **kwargs):
+    First_Merge    = concatenate([Speed_Model1.output, Steer_Model1.output], name='Concatenate')
+    #print(merged_layers)           
+    #out = BatchNormalization()(merged_layers)
+    Speed_Continue = Dense(50, activation='elu')(First_Merge)
+    Speed_Continue = Dropout(args.keep_prob, name='Dropout5')(Speed_Continue)
+    Speed_Out      = Dense(1, name='Speed')(Speed_Continue)
+    Speed_Model    = Model(inputs = [Steer_In,Speed_In],outputs = [Speed_Out])
+    #continue Steering model
+    Steer_Continue = Dense(50, activation='relu')(Steer_out) #node 1 output to FC3
+    Steer_Continue = Dropout(args.keep_prob, name='Dropout6')(Steer_Continue) #steer output
+    Steer_Continue = Dense(1 , name = 'Steer')(Steer_Continue)
+    Steer_Model    = Model(inputs = [Steer_In],outputs = [Steer_Continue])
+    Final_Model    = Model(inputs=[Steer_In , Speed_In], outputs=[Speed_Model.output , Steer_Model.output])
+    ########################################################################
+    #Steer_Model.compile(loss='mean_squared_error', optimizer=Adam(lr=args.learning_rate))
+    if Compute_Time == True :
+        return Steer_Model1  , Speed_Model1 , Speed_Model ,Steer_Model ,Final_Model #, Steer_Model
+    else:
+        Final_Model.summary()
+        return Final_Model
 
 def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer, Y_valid_steer , X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed ,Continue = 0):
     """
@@ -200,41 +262,54 @@ def train_model(concate_model, args,X_train_image, X_valid_image, Y_train_steer,
     #The generator is run in parallel to the model, for efficiency. 
     #For instance, this allows you to do real-time data augmentation on images on CPU in 
     #parallel to training your model on GPU.
-    #so we reshape our data into their appropriate batches and train our model simulatenously
+    #so we reshape our data into their appropriate batches and train our model simulatenously nb_val_samples=len(X_valid_image),
     if Continue == False:
-        concate_model.compile(loss='mean_squared_error' ,metrics={'Steer': 'mean_absolute_error', 'Speed':'mean_absolute_error'}, optimizer=Adam(learning_rate=args.learning_rate))
+        #concate_model.compile(loss='mean_squared_error' ,metrics={'Steer': 'mse', 'Speed':'mse'}, optimizer=Adam(learning_rate=args.learning_rate))
+        concate_model.compile(loss='mean_squared_error' ,metrics={'Steer': 'mse', 'Speed':'mse'}, optimizer=Adam(learning_rate=args.learning_rate))
         history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True,args.samples_per_epoch),
                             args.samples_per_epoch,
                             args.nb_epoch,
-                            max_q_size=1,
+                            max_q_size=10,
                             validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False,args.samples_per_epoch),
-                               nb_val_samples=len(X_valid_image),
                             callbacks=[checkpoint],
-                            verbose = 1)
+                            verbose = 1,validation_steps = args.samples_per_epoch*args.batch_size*args.test_size)
     else:
         history = concate_model.fit_generator(batch_generator(args.data_dir,X_train_image ,X_train_Sequence,Y_train_steer,Y_train_speed, args.batch_size, True,args.samples_per_epoch),
                             args.samples_per_epoch,
                             args.nb_epoch,
                             validation_data=batch_generator(args.data_dir, X_valid_image,X_valid_Sequence ,Y_valid_steer ,Y_valid_speed, args.batch_size, False,args.samples_per_epoch),
                             callbacks=[checkpoint],
-                            verbose = 1,validation_steps = samples_per_epoch*batch_size*test_size)
-    '''   
-    plt.plot(history.history['accuracy'])
-    plt.plot(history.history['val_accuracy'])
-    plt.title('model accuracy')
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
-    plt.show()
-    # summarize history for loss
+                            verbose = 1,validation_steps = args.samples_per_epoch*args.batch_size*args.test_size)
+    #visulize steering angle mean square error over training 
     plt.plot(history.history['loss'])
     plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'validate'], loc='upper left')
     plt.show()
-    '''
+
+
+    plt.plot(history.history['Steer_mse'])
+    plt.plot(history.history['val_Steer_mse'])
+    plt.title('Steering angle mean_squared_error')
+    plt.ylabel('mean_squared_error')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validate'], loc='upper left')
+    plt.show()
+
+    plt.plot(history.history['Speed_mse'])
+    plt.plot(history.history['val_Speed_mse'])
+    plt.title('Speed mean_squared_error')
+    plt.ylabel('mean_squared_error')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validate'], loc='upper left')
+    plt.show()
+
+    # Plot training & validation loss values
+
+
+    
 #for command line args
 def s2b(s):
     """
@@ -286,10 +361,10 @@ def main():
     parser.add_argument('-t', help='test size fraction',    dest='test_size',         type=float, default=0.2)
     parser.add_argument('-k', help='drop out probability',  dest='keep_prob',         type=float, default=0.5)
     parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=20)
-    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=600)
-    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=32)
+    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=150) #150
+    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=64) #128
     parser.add_argument('-o', help='save best models only', dest='save_best_only',    type=s2b,   default='true')
-    parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1.0e-4)
+    parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1e-4)
     args = parser.parse_args()
 
     #print parameters
