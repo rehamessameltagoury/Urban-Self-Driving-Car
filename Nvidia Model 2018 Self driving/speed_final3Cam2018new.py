@@ -289,7 +289,7 @@ def main():
     parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=600)
     parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=32)
     parser.add_argument('-o', help='save best models only', dest='save_best_only',    type=s2b,   default='true')
-    parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=0.001)
+    parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1.0e-4)
     args = parser.parse_args()
 
     #print parameters
