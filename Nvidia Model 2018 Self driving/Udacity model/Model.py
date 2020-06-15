@@ -81,8 +81,8 @@ def load_data(args):
     #S = data_df['speed'].values
     #now we can split the data into a training (80), testing(20), and validation set
     #thanks scikit learn
-    X_train_image, X_valid_image, Y_train_steer, Y_valid_steer =train_test_split(x_Images, y_steer, test_size=args.test_size, random_state=46,shuffle= True)
-    X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed = train_test_split(x_Speed_Sequence, y_speed, test_size=args.test_size, random_state=46,shuffle= True)
+    X_train_image, X_valid_image, Y_train_steer, Y_valid_steer =train_test_split(x_Images, y_steer, test_size=args.test_size, random_state=42,shuffle= False)
+    X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed = train_test_split(x_Speed_Sequence, y_speed, test_size=args.test_size, random_state=42,shuffle= False)
     return  X_train_image, X_valid_image, Y_train_steer, Y_valid_steer , X_train_Sequence, X_valid_Sequence, Y_train_speed, Y_valid_speed  #, y_train_steer, y_valid_steer
 
 
@@ -104,8 +104,12 @@ def build_model_speed(args , Compute_Time = False):
     Steer = MaxPooling2D(pool_size=(3,3),strides=(2,2))(Steer)#assumed that stride step is 3x3
     #conv3
     Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
+    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
+    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
+
+    Steer = Conv2D(filters =384,kernel_size =(3, 3), activation='relu', strides=(1,1))(Steer)
     #conv4
-    Steer = Conv2D(filters =384,kernel_size =(3,3), activation='relu', strides=(1,1))(Steer)
+
     #conv5
     Steer = Conv2D(filters = 256,kernel_size =(3, 3), activation='relu',strides=(1,1))(Steer)
     Steer = Flatten()(Steer)
@@ -305,12 +309,12 @@ def main():
     Load train/validation data set and train the model
     """
     parser = argparse.ArgumentParser(description='Behavioral Cloning Training Program')
-    parser.add_argument('-d', help='data directory',        dest='data_dir',          type=str,   default='D:/Graduation project/Udacity simulator/Classification/Scaled')
+    parser.add_argument('-d', help='data directory',        dest='data_dir',          type=str,   default='D:/Graduation project/Udacity simulator/IMG')
     parser.add_argument('-t', help='test size fraction',    dest='test_size',         type=float, default=0.2)
     parser.add_argument('-k', help='drop out probability',  dest='keep_prob',         type=float, default=0.5)
     parser.add_argument('-n', help='number of epochs',      dest='nb_epoch',          type=int,   default=20)
-    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=500) #150
-    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=64) #128
+    parser.add_argument('-s', help='samples per epoch',     dest='samples_per_epoch', type=int,   default=2000) #150
+    parser.add_argument('-b', help='batch size',            dest='batch_size',        type=int,   default=128) #128
     parser.add_argument('-v', help='batch size',            dest='ValidationBatch_Size',type=int,   default=64) #128
     parser.add_argument('-o', help='save best models only', dest='save_best_only',    type=s2b,   default='false')
     parser.add_argument('-l', help='learning rate',         dest='learning_rate',     type=float, default=1e-4)
@@ -335,7 +339,7 @@ def main():
         Compute_Timing(args)
     elif args.continue_learning:
 
-        Total_Model = load_model('model-014.h5')
+        Total_Model = load_model('model-029.h5')
         train_model(Total_Model, args,*data , Continue = True)
         Total_Model.save("model.h5")
         print("Done")

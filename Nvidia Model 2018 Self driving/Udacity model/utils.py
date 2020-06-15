@@ -229,7 +229,7 @@ def batch_generator(data_dir, image_paths, speed_sequences , steering_angles,spe
                 image = load_image(data_dir, center) 
             # add the image and steering angle to the batch
             images[i] = preprocess(image)
-            steers[i] = float("{:.3f}".format((steering_angle+1)))
+            steers[i] = float("{:.3f}".format((steering_angle+1)/2))
             temp = np.array(speed_seqq)
             temp = temp.reshape((10,1))
 

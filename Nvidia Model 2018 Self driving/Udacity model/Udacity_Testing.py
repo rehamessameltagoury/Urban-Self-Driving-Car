@@ -44,8 +44,9 @@ model2 = None
 prev_image_array = None
 
 #set min/max speed for our autonomous car
-MAX_SPEED = 30
-MIN_SPEED = 0
+MAX_SPEED = 25
+
+MIN_SPEED = 0.001
 speed_sequence = np.zeros((1,10,1))
 #and a speed limit
 speed_limit = MAX_SPEED
@@ -78,7 +79,7 @@ def telemetry(sid, data):
             # lower the throttle as the speed increases
             # if the speed is above the current speed limit, we are on a downhill.
             # make sure we slow down first and then go back to the original max speed.
-            predicted_steer = steering_angle[0][0] -1.0
+            predicted_steer = (steering_angle[0][0]*2.0) -1.0
             acceleration_type = 0
             for i in range(1,3):
                 temp = Predicted_speed[0][0]
@@ -111,13 +112,21 @@ def telemetry(sid, data):
                 speed_limit = MIN_SPEED  # slow down
             else:
                 speed_limit = MAX_SPEED
-            throttle = 1.0 - predicted_steer**2 - (speed/speed_limit)**2
+            
 
+            #throttle = 1.0 - predicted_steer**2 - (speed/speed_limit)**2
+            #if predicted_steer >0.1 or predicted_steer <-0.1:
+            #	throttle = 0.2
+            #else:
+            throttle = 1.0 - predicted_steer**2 - (speed/speed_limit)**2
             #print('{} {} {}'.format(steering_angle, throttle, speed))
             print("Speed = " , str(format(speed, '.4f')))
             print("Steering angle = ", str(format(predicted_steer, '.4f')))
             print("throttle = " , str(format(throttle, '.4f')))
             send_control(predicted_steer, throttle,speed)
+            print()
+            print("-----------------------------------------------------------------------")
+            print()
         except Exception as e:
             print(e)
 
