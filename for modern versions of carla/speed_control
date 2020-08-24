@@ -1,0 +1,54 @@
+class speed_control():
+    """
+    PIDLongitudinalController implements longitudinal control using a PID.
+    """
+# onother one PID >> P=1.0, I=1.0, D=0.0005 and p = 2 , i = 0.05 d = 0.01 or K_p=0.15, K_d=0., K_i=0.0003 in gethup referance
+    def __init__(self , vehicle):
+        """
+        :param vehicle: actor to apply to local planner logic onto
+        :param K_P: Proportional term
+        :param K_D: Differential term
+        :param K_I: Integral term
+        :param dt: time differential in seconds
+        """
+        self._vehicle = vehicle
+        self._K_P = 3.0
+        self._K_D = 0.0005
+        self._K_I = 1.0
+        self._dt = 0.07##default is 0.03## opt is 0.05 or 0.06 ## best 0.07
+        self._e_buffer = deque(maxlen=30)
+
+    def run_step(self, target_speed, debug=False):
+        """
+        Execute one step of longitudinal control to reach a given target speed.
+
+        :param target_speed: target speed in Km/h
+        :return: throttle control in the range [0, 1]
+        """
+        vel = self._vehicle.get_velocity()
+        current_speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+
+        if debug:
+            print('Current speed = {}'.format(current_speed))
+
+        return self._pid_control(target_speed, current_speed)
+
+    def _pid_control(self, target_speed, current_speed):
+        """
+        Estimate the throttle of the vehicle based on the PID equations
+
+        :param target_speed:  target speed in Km/h
+        :param current_speed: current speed of the vehicle in Km/h
+        :return: throttle control in the range [0, 1]
+        """
+        _e = (target_speed - current_speed)
+        self._e_buffer.append(_e)
+
+        if len(self._e_buffer) >= 2:
+            _de = (self._e_buffer[-1] - self._e_buffer[-2]) / self._dt
+            _ie = sum(self._e_buffer) * self._dt
+        else:
+            _de = 0.0
+            _ie = 0.0
+
+        return np.clip((self._K_P * _e) + (self._K_D * _de / self._dt) + (self._K_I * _ie * self._dt), 0.3, 0.7)### default 0.0 to 1.0 ## opt 0.3 , 0.85 ##pest 0.3 , 0.7 
